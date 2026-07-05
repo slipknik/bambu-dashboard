@@ -30,3 +30,5 @@ ams_transitions_*.jsonl
 
 dist.zip
 *backup*.py
+
+.claude/
