@@ -27,3 +27,6 @@ desktop.ini
 # Debug
 mqtt_debug_*.json
 ams_transitions_*.jsonl
+
+dist.zip
+*backup*.py
