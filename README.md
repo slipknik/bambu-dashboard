@@ -1,7 +1,6 @@
 # Bambu Dashboard personale
 
-Una dashboard Windows personalizzata per le tue stampanti Bambu Lab (A1 +
-una futura seconda stampante), con **solo** le informazioni che ti
+Una dashboard Windows personalizzata per le tue stampanti Bambu Lab  con **solo** le informazioni che ti
 servono davvero — senza passare da piattaforme terze come BambuHelper,
 SimplyPrint, OctoEverywhere, ecc. Il programma parla direttamente con i
 server ufficiali Bambu Lab (gli stessi di Bambu Handy) e con le tue
