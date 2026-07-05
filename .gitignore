@@ -1,0 +1,29 @@
+﻿# Ambiente virtuale Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# PyInstaller output
+build/
+dist/
+*.spec.bak
+
+# Dati utente locali (token di login, storico, log)
+data/
+*.log
+exe_run.log
+
+# File di sistema Windows
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.suo
+
+# Debug
+mqtt_debug_*.json
+ams_transitions_*.jsonl

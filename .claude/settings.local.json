@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\ffbk\\\\Desktop\\\\bambu_dashboard\" /a /b)",
+      "Bash(.venv/Scripts/python.exe -m py_compile models.py gui/ams_tray.py gui/printer_card.py)",
+      "Bash(.venv\\\\Scripts\\\\python.exe -m PyInstaller bambu_dashboard.spec)",
+      "Bash(.venv/Scripts/python.exe -m py_compile gui/login_dialog.py)",
+      "Bash(.venv/Scripts/python.exe -c \"from PySide6.QtWebEngineWidgets import QWebEngineView; print\\('OK'\\)\")",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(Get-Content *)",
+      "Bash(.venv/Scripts/python.exe -m py_compile gui/ams_tray.py gui/printer_card.py)",
+      "WebFetch(domain:wiki.bambulab.com)",
+      "WebFetch(domain:help.simplyprint.io)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(& \"C:\\\\Users\\\\ffbk\\\\AppData\\\\Local\\\\Programs\\\\Inno Setup 6\\\\iscc.exe\" \"C:\\\\Users\\\\ffbk\\\\Desktop\\\\bambu_dashboard\\\\installer.iss\")"
+    ]
+  }
+}
