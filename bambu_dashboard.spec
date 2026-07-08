@@ -18,6 +18,8 @@ a = Analysis(
     datas=[
         ('logo2.ico', '.'),
         ('translations.py', '.'),
+        ('app_icon.py', '.'),
+        ('gui/icon_helper.py', 'gui'),
     ],
     hiddenimports=[
         'PySide6.QtNetwork',

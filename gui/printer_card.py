@@ -223,13 +223,15 @@ class PrinterCard(QWidget):
     }
 
     def set_connected(self, connected: bool) -> None:
-        if connected:
-            self.state_badge.setText(tr("connected").upper() + "…")
-            self.state_badge.setStyleSheet("color: #888; font-size: 17px; font-weight: bold;")
-        else:
+        if not connected:
+            # La stampante è definitivamente offline: mostriamolo
             self.state_badge.setText(tr("disconnected").upper())
             self.state_badge.setStyleSheet("color: gray; font-size: 17px; font-weight: bold;")
             self.wifi_label.setText("")
+        # Se connected=True non facciamo nulla: il badge verrà aggiornato
+        # da update_status quando arrivano i dati reali via MQTT.
+        # Questo evita il badge "CONNECTED..." ambiguo che appare anche
+        # quando la stampante è spenta ma il cloud la segna ancora online.
 
     def update_status(self, status: PrinterStatus) -> None:
         # Badge stato principale — MAIUSCOLO, stessa colonna di fasi e AMS

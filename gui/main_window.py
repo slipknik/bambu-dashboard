@@ -175,14 +175,12 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------
     def _build_tray(self) -> QSystemTrayIcon:
-        if getattr(sys, "frozen", False):
-            base = sys._MEIPASS
-        else:
-            base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        ico_path = os.path.join(base, "icona4.ico")
-        icon = QIcon(ico_path) if os.path.exists(ico_path) else self.style().standardIcon(
-            self.style().StandardPixmap.SP_ComputerIcon
-        )
+        from gui.icon_helper import make_app_icon
+        icon = make_app_icon()
+        # Imposta l'icona sulla finestra solo quando NON siamo nell'exe compilato
+        # (nell'exe PyInstaller la gestisce già come risorsa PE, meglio non sovrascriverla)
+        if not getattr(sys, "frozen", False):
+            self.setWindowIcon(icon)
         tray = QSystemTrayIcon(icon, self)
         tray.setToolTip("Bambu Dashboard")
         tray.activated.connect(self._on_tray_activated)

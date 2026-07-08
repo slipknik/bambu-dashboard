@@ -9,7 +9,7 @@
 ; Output: dist\BambuDashboard_Setup.exe
 
 #define AppName      "Bambu Dashboard"
-#define AppVersion   "1.2.0"
+#define AppVersion   "1.3.0"
 #define AppPublisher "Bambu Dashboard"
 #define AppExeName   "BambuDashboard.exe"
 #define AppGUID      "{{B56C71D2-8A2D-4B9F-8408-A9369C9588C0}"
