@@ -16,7 +16,7 @@ class CircularGauge(QWidget):
         super().__init__(parent)
         self._value = 0  # percentuale 0-100
         self._thickness = thickness
-        self._track_color = QColor("#3a3a3a")
+        self._track_color = QColor("#1a4a1a")
         self._progress_color = QColor("#19F01C")
         self._text_color = QColor("#e8e8e8")
         self._label = ""  # piccola etichetta sotto la percentuale (es. "12/12")

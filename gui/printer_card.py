@@ -18,6 +18,25 @@ from gui.circular_gauge import CircularGauge
 from gui.ams_tray import AmsTraySlot, AmsUnitWidget
 from translations import tr
 
+
+def _load_status_icons():
+    """Carica le icone hotend e spool come QPixmap da base64 in status_icons.py.
+    Ritorna (hotend_pixmap, spool_pixmap) — None se il file non è disponibile."""
+    try:
+        import base64
+        from status_icons import HOTEND_ICON_B64, SPOOL_ICON_B64
+        from PySide6.QtCore import QByteArray
+
+        def _b64_to_pixmap(b64: str) -> QPixmap:
+            data = QByteArray(base64.b64decode(b64))
+            px = QPixmap()
+            px.loadFromData(data, "PNG")
+            return px if not px.isNull() else None
+
+        return _b64_to_pixmap(HOTEND_ICON_B64), _b64_to_pixmap(SPOOL_ICON_B64)
+    except Exception:
+        return None, None
+
 def PLACEHOLDER_TEXT() -> str:
     return tr("preview_none")
 PREVIEW_SIZE = 188
@@ -164,21 +183,48 @@ class PrinterCard(QWidget):
         self.state_badge.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         status_col.addWidget(self.state_badge)
 
-        # 🖨 fasi di stampa
-        self.stage_label = QLabel("")
-        self.stage_label.setStyleSheet("color: #4fc3f7; font-size: 17px; font-weight: bold;")
-        self.stage_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.stage_label.setWordWrap(True)
-        self.stage_label.setVisible(False)
-        status_col.addWidget(self.stage_label)
+        # Carica le icone una volta sola
+        _hotend_pixmap, _spool_pixmap = _load_status_icons()
 
-        # ⚙ operazioni AMS
+        # Hotend — fasi di stampa
+        self._stage_widget = QWidget()
+        self._stage_widget.setStyleSheet("background: transparent;")
+        _sl = QHBoxLayout(self._stage_widget)
+        _sl.setContentsMargins(0, 0, 0, 0)
+        _sl.setSpacing(6)
+        self._stage_icon = QLabel()
+        if _hotend_pixmap:
+            self._stage_icon.setPixmap(_hotend_pixmap)
+        self._stage_icon.setFixedSize(22, 22)
+        self._stage_icon.setScaledContents(True)
+        self.stage_label = QLabel("")
+        self.stage_label.setStyleSheet("color: #4fc3f7; font-size: 17px; font-weight: bold; background: transparent;")
+        self.stage_label.setWordWrap(True)
+        _sl.addWidget(self._stage_icon)
+        _sl.addWidget(self.stage_label)
+        _sl.addStretch()
+        self._stage_widget.setVisible(False)
+        status_col.addWidget(self._stage_widget)
+
+        # Rocchetto — operazioni AMS
+        self._ams_widget = QWidget()
+        self._ams_widget.setStyleSheet("background: transparent;")
+        _al = QHBoxLayout(self._ams_widget)
+        _al.setContentsMargins(0, 0, 0, 0)
+        _al.setSpacing(6)
+        self._ams_icon = QLabel()
+        if _spool_pixmap:
+            self._ams_icon.setPixmap(_spool_pixmap)
+        self._ams_icon.setFixedSize(22, 22)
+        self._ams_icon.setScaledContents(True)
         self.ams_badge = QLabel("")
-        self.ams_badge.setStyleSheet("color: #19F01C; font-size: 17px; font-weight: bold;")
-        self.ams_badge.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.ams_badge.setStyleSheet("color: #19F01C; font-size: 17px; font-weight: bold; background: transparent;")
         self.ams_badge.setWordWrap(True)
-        self.ams_badge.setVisible(False)
-        status_col.addWidget(self.ams_badge)
+        _al.addWidget(self._ams_icon)
+        _al.addWidget(self.ams_badge)
+        _al.addStretch()
+        self._ams_widget.setVisible(False)
+        status_col.addWidget(self._ams_widget)
 
         status_col.addStretch()
         top_row.addLayout(status_col, 1)
@@ -241,22 +287,20 @@ class PrinterCard(QWidget):
             f"color: {badge_color}; font-size: 17px; font-weight: bold;"
         )
 
-        # 🖨 Fase di stampa dettagliata (livellamento, riscaldamento, ecc.)
         stage_text = status.sub_stage_label
         if stage_text:
-            self.stage_label.setText(f"🖨  {stage_text}")
-            self.stage_label.setVisible(True)
+            self.stage_label.setText(stage_text)
+            self._stage_widget.setVisible(True)
         else:
-            self.stage_label.setVisible(False)
+            self._stage_widget.setVisible(False)
 
-        # ⚙ Operazione AMS (cambio filamento, taglio, spurgo, ecc.)
         from models import ams_status_label as _ams_status_label
         ams_text = _ams_status_label(status.ams_status)
         if ams_text:
-            self.ams_badge.setText(f"⚙  {ams_text}")
-            self.ams_badge.setVisible(True)
+            self.ams_badge.setText(ams_text)
+            self._ams_widget.setVisible(True)
         else:
-            self.ams_badge.setVisible(False)
+            self._ams_widget.setVisible(False)
 
         # Segnale Wi-Fi (Convertito a 5 tacche)
         if hasattr(status, "wifi_signal") and status.wifi_signal:

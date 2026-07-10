@@ -83,15 +83,19 @@ def _set_autostart(enable: bool) -> None:
 class _PreviewFetcher(QObject):
     preview_ready = Signal(str, bytes)
 
-    def fetch_async(self, cloud_client: BambuCloudClient, access_token: str, dev_id: str) -> None:
+    def fetch_async(self, cloud_client: BambuCloudClient, access_token: str, dev_id: str,
+                    task_name: str = "") -> None:
         thread = threading.Thread(
-            target=self._fetch, args=(cloud_client, access_token, dev_id), daemon=True
+            target=self._fetch, args=(cloud_client, access_token, dev_id, task_name), daemon=True
         )
         thread.start()
 
-    def _fetch(self, cloud_client: BambuCloudClient, access_token: str, dev_id: str) -> None:
+    def _fetch(self, cloud_client: BambuCloudClient, access_token: str, dev_id: str,
+               task_name: str = "") -> None:
         try:
-            cover_url = cloud_client.get_current_task_cover_url(access_token, dev_id)
+            cover_url = cloud_client.get_current_task_cover_url(
+                access_token, dev_id, task_name or None
+            )
             if not cover_url:
                 return
             resp = requests.get(cover_url, timeout=10)
@@ -159,7 +163,12 @@ class MainWindow(QMainWindow):
         self.preview_fetcher = _PreviewFetcher(self)
         self.preview_fetcher.preview_ready.connect(self._on_preview_ready)
         self._last_preview_task: dict[str, str] = {}
-        self._preview_cache: dict[str, bytes] = {}  # dev_id → bytes immagine, persiste tra i rebuild
+        self._preview_cache: dict[str, bytes] = {}   # chiave: dev_id
+        self._preview_task_key: dict[str, str] = {}  # dev_id → task_name per cui è stata scaricata
+        self._last_layer: dict[str, int] = {}
+        self._preview_retry_timer = QTimer(self)
+        self._preview_retry_timer.setInterval(15000)  # ogni 15 secondi nei primi layer
+        self._preview_retry_timer.timeout.connect(self._retry_missing_previews)
 
         self.tab_widget = QTabWidget()
         self.tab_widget.setStyleSheet(
@@ -492,6 +501,7 @@ class MainWindow(QMainWindow):
             conn.command_error.connect(self._show_error)
             conn.connect()
             self.connections[printer.dev_id] = conn
+        self._preview_retry_timer.start()
 
     def _on_status_updated(self, dev_id: str, status) -> None:
         card = self.cards.get(dev_id)
@@ -529,21 +539,58 @@ class MainWindow(QMainWindow):
                     QSystemTrayIcon.MessageIcon.Critical,
                 )
                 self._log_print_history(dev_id, printer_name, status, "Fallita")
-            elif prev in ("IDLE", "FINISH", "FAILED") and curr == "RUNNING":
+            elif prev in ("IDLE", "FINISH", "FAILED", "PREPARE") and curr == "RUNNING":
                 self._notify(
                     "Stampa avviata",
                     f"{printer_name}: {status.task_name or 'stampa in corso'}",
                     QSystemTrayIcon.MessageIcon.Information,
                 )
-                # Start time già impostato sopra — nessuna azione aggiuntiva
+                # Resetta la cache anteprima: anche se il nome del lavoro è
+                # identico al precedente (stessa stampa rilanciate), vogliamo
+                # sempre scaricare l'anteprima aggiornata della nuova sessione.
+                self._last_preview_task.pop(dev_id, None)
+                self._preview_cache.pop(dev_id, None)
+                # Pulisce anche l'anteprima visiva sulla card
+                card = self.cards.get(dev_id)
+                if card and card.preview_label:
+                    card.preview_label.clear()
+                    card.preview_label.setText(
+                        card.PLACEHOLDER_TEXT() if callable(getattr(card, "PLACEHOLDER_TEXT", None))
+                        else "Nessuna\nanteprima"
+                    )
 
         self._last_print_state[dev_id] = curr
+
+        # Rileva "Ristampa" avviata direttamente dal display della stampante:
+        # in quel caso la stampante non passa per FINISH→IDLE→RUNNING (la
+        # transizione non viene vista), ma il layer torna a 1 mentre la stampa
+        # era già considerata finita o aveva un layer alto. Svuotiamo la cache
+        # se il layer è tornato a ≤2 mentre eravamo convinti di avere un'anteprima.
+        current_layer = getattr(status, "current_layer", None) or 0
+        last_layer = self._last_layer.get(dev_id, 0)
+        if (curr == "RUNNING" and current_layer <= 2 and last_layer > 10
+                and dev_id in self._preview_cache):
+            self._last_preview_task.pop(dev_id, None)
+            self._preview_cache.pop(dev_id, None)
+            card = self.cards.get(dev_id)
+            if card and card.preview_label:
+                card.preview_label.clear()
+                card.preview_label.setText(
+                    card.PLACEHOLDER_TEXT() if callable(getattr(card, "PLACEHOLDER_TEXT", None))
+                    else "Nessuna\nanteprima"
+                )
+        # Aggiorna il layer tracciato SOLO in RUNNING: se lo aggiornassimo anche
+        # in PREPARE/FINISH (dove il layer torna a 0), perderemmo l'evidenza
+        # "last_layer > 10" prima che il check qui sopra possa scattare.
+        if curr == "RUNNING":
+            self._last_layer[dev_id] = current_layer
 
         if status.task_name and self._last_preview_task.get(dev_id) != status.task_name:
             self._last_preview_task[dev_id] = status.task_name
             if self.cloud_client and self.config.access_token:
                 self.preview_fetcher.fetch_async(
-                    self.cloud_client, self.config.access_token, dev_id
+                    self.cloud_client, self.config.access_token, dev_id,
+                    status.task_name
                 )
 
     def _notify(self, title: str, message: str,
@@ -552,7 +599,9 @@ class MainWindow(QMainWindow):
             self._tray.showMessage(title, message, icon, 6000)
 
     def _on_preview_ready(self, dev_id: str, image_bytes: bytes) -> None:
-        self._preview_cache[dev_id] = image_bytes  # salva in cache per sopravvivere ai rebuild
+        self._preview_cache[dev_id] = image_bytes
+        # Registra per quale task è stata scaricata questa anteprima
+        self._preview_task_key[dev_id] = self._last_preview_task.get(dev_id, "")
         card = self.cards.get(dev_id)
         if card:
             card.set_preview_bytes(image_bytes)
@@ -647,9 +696,30 @@ class MainWindow(QMainWindow):
 
 
     def _disconnect_all(self) -> None:
+        self._preview_retry_timer.stop()
         for conn in self.connections.values():
             conn.disconnect()
         self.connections.clear()
+
+    def _retry_missing_previews(self) -> None:
+        """Ogni 15 secondi: scarica o riscarica l'anteprima se:
+        - La stampante è IN STAMPA
+        - Non abbiamo ancora un'anteprima per questo task (incluso ristampa stesso file)
+        - Il layer è ancora basso (≤ 10) — smette di riprovare a stampa avanzata"""
+        if not self.cloud_client or not self.config.access_token:
+            return
+        for dev_id, state in list(self._last_print_state.items()):
+            if state != "RUNNING":
+                continue
+            layer = self._last_layer.get(dev_id, 0)
+            task = self._last_preview_task.get(dev_id, "")
+            cached_task = self._preview_task_key.get(dev_id, "")
+            # Ritenta se: nessuna anteprima, OPPURE il task è cambiato rispetto a quello cachato
+            need_fetch = (dev_id not in self._preview_cache) or (task and task != cached_task)
+            if need_fetch and layer <= 10:
+                self.preview_fetcher.fetch_async(
+                    self.cloud_client, self.config.access_token, dev_id, task
+                )
 
     def _refresh_all(self) -> None:
         for conn in self.connections.values():

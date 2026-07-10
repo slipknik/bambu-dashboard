@@ -19,6 +19,7 @@ a = Analysis(
         ('logo2.ico', '.'),
         ('translations.py', '.'),
         ('app_icon.py', '.'),
+	('status_icons.py', '.'),
         ('gui/icon_helper.py', 'gui'),
     ],
     hiddenimports=[
